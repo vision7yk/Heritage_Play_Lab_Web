@@ -19,7 +19,7 @@ body{
 }
 .wrap{max-width:1100px;margin:0 auto;padding:28px 18px 60px}
 h1{font-size:clamp(28px,4vw,52px);line-height:1.12;margin:0 0 10px}
-.sub{color:var(--muted);font-size:16px;line-height:1.6;max-width:760px}
+.sub{color:var(--muted);font-size:16px;line-height:1.6;max-width:800px}
 .legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
 .pill{border-radius:999px;padding:8px 12px;font-size:14px;font-weight:800;color:#111}
 .yellow{background:var(--yellow)} .blue{background:var(--blue)}
@@ -53,7 +53,11 @@ footer{margin-top:30px;color:#778193;font-size:13px;text-align:center}
 <body>
 <div class="wrap">
   <h1>🎲 팀빌딩 아이스브레이커</h1>
-  <div class="sub">33개의 질문 카드 중 1인당 2~3장을 무작위로 뽑아 답해보세요. 카드를 클릭하면 질문이 공개됩니다.</div>
+  <div class="sub">
+    33개의 질문 카드 중 1인당 2~3장을 무작위로 뽑아 답해보세요.
+    <b>매번 파란색 협업 질문이 1장 이상 반드시 포함됩니다.</b>
+    카드를 클릭하면 질문이 공개됩니다.
+  </div>
   <div class="legend">
     <span class="pill yellow">노란색 = 가벼운 질문</span>
     <span class="pill blue">파란색 = 협업 성향 질문</span>
@@ -65,7 +69,7 @@ footer{margin-top:30px;color:#778193;font-size:13px;text-align:center}
       <button class="primary" onclick="drawCards(3)">3장 뽑기</button>
       <button class="secondary" onclick="drawCards(currentCount || 3)">다시 섞기</button>
       <button class="ghost" onclick="resetDeck()">전체 초기화</button>
-      <div class="status" id="status">33장 준비됨</div>
+      <div class="status" id="status">노랑 28장 · 파랑 5장 준비됨</div>
     </div>
 
     <div id="cards" class="cards">
@@ -73,7 +77,7 @@ footer{margin-top:30px;color:#778193;font-size:13px;text-align:center}
     </div>
 
     <div class="rules">
-      <div class="rule"><b>1.</b> 한 사람씩 2~3장을 뽑습니다.</div>
+      <div class="rule"><b>1.</b> 2장 = 노랑 1 + 파랑 1 / 3장 = 노랑 2 + 파랑 1</div>
       <div class="rule"><b>2.</b> 카드를 뒤집고 30~60초 안에 답합니다.</div>
       <div class="rule"><b>3.</b> 답변 중 공통점 하나를 찾아 팀 대화로 연결합니다.</div>
     </div>
@@ -119,11 +123,15 @@ const questions = [
 {n:33,c:'blue',q:'오늘 처음 만난 팀원들에게 한 가지 질문을 꼭 할 수 있다면 무엇을 묻고 싶은가?'}
 ];
 
-let remaining=[...questions];
-let currentCount=0;
+const allYellow = questions.filter(x => x.c === 'yellow');
+const allBlue = questions.filter(x => x.c === 'blue');
+
+let remainingYellow = [...allYellow];
+let remainingBlue = [...allBlue];
+let currentCount = 0;
 
 function shuffle(arr){
-  const a=[...arr];
+  const a = [...arr];
   for(let i=a.length-1;i>0;i--){
     const j=Math.floor(Math.random()*(i+1));
     [a[i],a[j]]=[a[j],a[i]];
@@ -131,16 +139,50 @@ function shuffle(arr){
   return a;
 }
 
-function drawCards(count){
-  currentCount=count;
-  if(remaining.length<count) remaining=[...questions];
-  const shuffled=shuffle(remaining);
-  const picked=shuffled.slice(0,count);
-  const ids=new Set(picked.map(x=>x.n));
-  remaining=remaining.filter(x=>!ids.has(x.n));
+function takeFromCategory(category, count){
+  let pool = category === 'yellow' ? remainingYellow : remainingBlue;
+  const master = category === 'yellow' ? allYellow : allBlue;
 
-  const box=document.getElementById('cards');
-  box.innerHTML='';
+  // 해당 색 카드가 부족하면 그 색 카드만 다시 채운다.
+  if(pool.length < count){
+    pool = [...master];
+    if(category === 'yellow') remainingYellow = pool;
+    else remainingBlue = pool;
+  }
+
+  const picked = shuffle(pool).slice(0,count);
+  const ids = new Set(picked.map(x=>x.n));
+
+  if(category === 'yellow'){
+    remainingYellow = remainingYellow.filter(x=>!ids.has(x.n));
+  } else {
+    remainingBlue = remainingBlue.filter(x=>!ids.has(x.n));
+  }
+  return picked;
+}
+
+function drawCards(count){
+  currentCount = count;
+
+  // 2장 = 노랑 1 + 파랑 1
+  // 3장 = 노랑 2 + 파랑 1
+  const blueCount = 1;
+  const yellowCount = count - blueCount;
+
+  const picked = [
+    ...takeFromCategory('yellow', yellowCount),
+    ...takeFromCategory('blue', blueCount)
+  ];
+
+  const finalCards = shuffle(picked);
+  renderCards(finalCards);
+  updateStatus();
+}
+
+function renderCards(picked){
+  const box = document.getElementById('cards');
+  box.innerHTML = '';
+
   picked.forEach(item=>{
     const card=document.createElement('div');
     card.className='card';
@@ -160,14 +202,20 @@ function drawCards(count){
       </div>`;
     box.appendChild(card);
   });
-  document.getElementById('status').textContent=`${remaining.length}장 남음`;
+}
+
+function updateStatus(){
+  document.getElementById('status').textContent =
+    `남은 카드: 노랑 ${remainingYellow.length}장 · 파랑 ${remainingBlue.length}장`;
 }
 
 function resetDeck(){
-  remaining=[...questions];
+  remainingYellow=[...allYellow];
+  remainingBlue=[...allBlue];
   currentCount=0;
-  document.getElementById('cards').innerHTML='<div class="empty">전체 카드를 다시 섞었습니다. <b>2장 뽑기</b> 또는 <b>3장 뽑기</b>를 눌러주세요.</div>';
-  document.getElementById('status').textContent='33장 준비됨';
+  document.getElementById('cards').innerHTML=
+    '<div class="empty">전체 카드를 다시 섞었습니다. <b>2장 뽑기</b> 또는 <b>3장 뽑기</b>를 눌러주세요.</div>';
+  document.getElementById('status').textContent='노랑 28장 · 파랑 5장 준비됨';
 }
 </script>
 </body>
