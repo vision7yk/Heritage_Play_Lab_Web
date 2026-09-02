@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>팀빌딩 아이스브레이커 카드게임</title>
+<style>
+:root{
+  --bg:#0f1115; --panel:#181b22; --text:#f5f7fb; --muted:#aeb6c5;
+  --yellow:#ffd95a; --blue:#75b8ff; --border:#2a2f3a;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;font-family:Pretendard,"Noto Sans KR",system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+  background:radial-gradient(circle at top left,rgba(117,184,255,.14),transparent 30%),
+             radial-gradient(circle at top right,rgba(255,217,90,.12),transparent 28%),
+             var(--bg);
+  color:var(--text);min-height:100vh
+}
+.wrap{max-width:1100px;margin:0 auto;padding:28px 18px 60px}
+h1{font-size:clamp(28px,4vw,52px);line-height:1.12;margin:0 0 10px}
+.sub{color:var(--muted);font-size:16px;line-height:1.6;max-width:760px}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.pill{border-radius:999px;padding:8px 12px;font-size:14px;font-weight:800;color:#111}
+.yellow{background:var(--yellow)} .blue{background:var(--blue)}
+.panel{background:rgba(24,27,34,.9);border:1px solid var(--border);border-radius:20px;padding:18px;margin-top:24px}
+.controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+button{border:0;border-radius:14px;padding:12px 16px;font-size:16px;font-weight:800;cursor:pointer}
+.primary{background:#fff;color:#111}.secondary{background:#2a2f3a;color:#fff}.ghost{background:transparent;color:#dce3ef;border:1px solid #3a414f}
+.status{margin-left:auto;color:var(--muted);font-size:14px}
+.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:18px}
+@media(max-width:800px){.cards{grid-template-columns:1fr}.status{width:100%;margin-left:0}}
+.card{min-height:260px;border-radius:22px;perspective:1000px;cursor:pointer}
+.card-inner{position:relative;width:100%;height:100%;min-height:260px;transition:transform .55s ease;transform-style:preserve-3d}
+.card.revealed .card-inner{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;padding:24px;border-radius:22px;backface-visibility:hidden;display:flex;flex-direction:column;justify-content:space-between;box-shadow:0 15px 38px rgba(0,0,0,.22)}
+.front{background:linear-gradient(135deg,#252b35,#151920);border:1px solid #323946}
+.back{transform:rotateY(180deg);color:#111}
+.back.yellow{background:linear-gradient(135deg,#ffe37f,var(--yellow))}
+.back.blue{background:linear-gradient(135deg,#9bd0ff,var(--blue))}
+.num{font-size:14px;font-weight:900;opacity:.7}
+.icon{font-size:54px}.hint{color:#c7cfdb;font-size:15px;font-weight:700}
+.question{font-size:clamp(20px,2.2vw,28px);line-height:1.45;font-weight:900}
+.tag{font-size:13px;font-weight:900}
+.empty{text-align:center;color:var(--muted);padding:46px 10px 24px;grid-column:1/-1}
+.rules{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:18px}
+@media(max-width:800px){.rules{grid-template-columns:1fr}}
+.rule{background:#13161c;border:1px solid var(--border);border-radius:16px;padding:15px;color:#d8deea;line-height:1.5}
+.rule b{color:#fff}
+footer{margin-top:30px;color:#778193;font-size:13px;text-align:center}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🎲 팀빌딩 아이스브레이커</h1>
+  <div class="sub">33개의 질문 카드 중 1인당 2~3장을 무작위로 뽑아 답해보세요. 카드를 클릭하면 질문이 공개됩니다.</div>
+  <div class="legend">
+    <span class="pill yellow">노란색 = 가벼운 질문</span>
+    <span class="pill blue">파란색 = 협업 성향 질문</span>
+  </div>
+
+  <section class="panel">
+    <div class="controls">
+      <button class="primary" onclick="drawCards(2)">2장 뽑기</button>
+      <button class="primary" onclick="drawCards(3)">3장 뽑기</button>
+      <button class="secondary" onclick="drawCards(currentCount || 3)">다시 섞기</button>
+      <button class="ghost" onclick="resetDeck()">전체 초기화</button>
+      <div class="status" id="status">33장 준비됨</div>
+    </div>
+
+    <div id="cards" class="cards">
+      <div class="empty">위의 <b>2장 뽑기</b> 또는 <b>3장 뽑기</b>를 눌러 시작하세요.</div>
+    </div>
+
+    <div class="rules">
+      <div class="rule"><b>1.</b> 한 사람씩 2~3장을 뽑습니다.</div>
+      <div class="rule"><b>2.</b> 카드를 뒤집고 30~60초 안에 답합니다.</div>
+      <div class="rule"><b>3.</b> 답변 중 공통점 하나를 찾아 팀 대화로 연결합니다.</div>
+    </div>
+  </section>
+
+  <footer>실감영상콘텐츠제작 · 2주차 팀빌딩</footer>
+</div>
+
+<script>
+const questions = [
+{n:1,c:'yellow',q:'만약 당신에게 슈퍼 히어로 같은 힘이 생긴다면? 무엇을 하고 싶은가?'},
+{n:2,c:'yellow',q:'함께 저녁을 먹고 싶은 역사 속 인물은 누구인가?'},
+{n:3,c:'yellow',q:'단 한 가지 취미를 가질 수 있다면 어떤 취미를 가지고 싶은가?'},
+{n:4,c:'yellow',q:'당신이 한 행동 중 가장 미쳤다고 생각되는 것은?'},
+{n:5,c:'yellow',q:'유명 인물이 될 수 있다면, 누가 되고 싶은가?'},
+{n:6,c:'yellow',q:'시간 여행을 할 수 있다면, 과거로 갈 것인가? 미래로 갈 것인가?'},
+{n:7,c:'yellow',q:'당신이 가장 좋아하는 만화는 무엇인가?'},
+{n:8,c:'yellow',q:'당신의 이상적인 휴가는?'},
+{n:9,c:'yellow',q:'어떤 상황에서도 입지 않을 옷의 종류는?'},
+{n:10,c:'yellow',q:'당신이 가장 좋아하는 책 또는 영화는 무엇인가?'},
+{n:11,c:'yellow',q:'당신이 동물이라면, 무엇이 되고 싶은가?'},
+{n:12,c:'yellow',q:'당신의 친구들은 당신을 어떻게 묘사할 것 같은가?'},
+{n:13,c:'yellow',q:'당신의 자서전에 어울리는 제목은 무엇인가?'},
+{n:14,c:'yellow',q:'하루 동안 다른 사람의 능력 하나를 빌릴 수 있다면 누구의 어떤 능력을 빌리고 싶은가?'},
+{n:15,c:'yellow',q:'갑자기 1억 원이 생겼는데 오늘 안에 다 써야 한다면 무엇을 할 것인가?'},
+{n:16,c:'yellow',q:'평생 한 가지 음식만 먹어야 한다면 무엇을 선택할 것인가?'},
+{n:17,c:'yellow',q:'당신의 인생을 영화로 만든다면 어떤 장르가 가장 잘 어울릴 것 같은가?'},
+{n:18,c:'yellow',q:'지금 당장 아무 준비 없이 여행을 떠날 수 있다면 어디로 가고 싶은가?'},
+{n:19,c:'yellow',q:'당신에게 가장 잘 어울리는 색은 무엇이라고 생각하는가?'},
+{n:20,c:'yellow',q:'딱 하루만 투명인간이 된다면 가장 먼저 무엇을 할 것인가?'},
+{n:21,c:'yellow',q:'무인도에 딱 세 가지 물건만 가져갈 수 있다면 무엇을 가져가겠는가?'},
+{n:22,c:'yellow',q:'당신이 가장 듣기 좋아하는 칭찬은 무엇인가?'},
+{n:23,c:'yellow',q:'하루 동안 휴대폰 없이 살아야 한다면 가장 힘들 것 같은 것은 무엇인가?'},
+{n:24,c:'yellow',q:'당신을 가장 쉽게 웃게 만드는 것은 무엇인가?'},
+{n:25,c:'yellow',q:'당신이 절대로 포기하지 못할 작은 습관 하나는?'},
+{n:26,c:'yellow',q:'당신이 살고 싶은 가상의 세계가 있다면 어디인가?'},
+{n:27,c:'yellow',q:'당신의 인생에 배경음악을 하나 넣는다면 어떤 노래나 음악 장르를 선택하겠는가?'},
+{n:28,c:'blue',q:'팀 프로젝트에서 당신이 자연스럽게 맡게 되는 역할은 무엇인가? (아이디어 / 정리 / 발표 / 분위기 / 마무리 등)'},
+{n:29,c:'blue',q:'같이 프로젝트하고 싶은 사람의 가장 중요한 특징 한 가지는?'},
+{n:30,c:'blue',q:'프로젝트를 하면서 가장 스트레스 받는 순간은 언제인가?'},
+{n:31,c:'yellow',q:'아무 쓸모 없어도 갖고 싶은 능력 하나가 있다면?'},
+{n:32,c:'blue',q:'지금까지 본 전시·공연·영상 중 “이건 직접 만들어보고 싶다”라고 생각한 것이 있다면?'},
+{n:33,c:'blue',q:'오늘 처음 만난 팀원들에게 한 가지 질문을 꼭 할 수 있다면 무엇을 묻고 싶은가?'}
+];
+
+let remaining=[...questions];
+let currentCount=0;
+
+function shuffle(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [a[i],a[j]]=[a[j],a[i]];
+  }
+  return a;
+}
+
+function drawCards(count){
+  currentCount=count;
+  if(remaining.length<count) remaining=[...questions];
+  const shuffled=shuffle(remaining);
+  const picked=shuffled.slice(0,count);
+  const ids=new Set(picked.map(x=>x.n));
+  remaining=remaining.filter(x=>!ids.has(x.n));
+
+  const box=document.getElementById('cards');
+  box.innerHTML='';
+  picked.forEach(item=>{
+    const card=document.createElement('div');
+    card.className='card';
+    card.onclick=()=>card.classList.toggle('revealed');
+    card.innerHTML=`
+      <div class="card-inner">
+        <div class="face front">
+          <div class="num">CARD ${item.n}</div>
+          <div class="icon">${item.c==='yellow'?'✨':'🤝'}</div>
+          <div class="hint">클릭해서 질문 보기</div>
+        </div>
+        <div class="face back ${item.c}">
+          <div class="tag">${item.c==='yellow'?'가벼운 질문':'협업 성향 질문'} · CARD ${item.n}</div>
+          <div class="question">${item.q}</div>
+          <div class="tag">답변 후 다른 팀원에게 한 가지 추가 질문을 해보세요.</div>
+        </div>
+      </div>`;
+    box.appendChild(card);
+  });
+  document.getElementById('status').textContent=`${remaining.length}장 남음`;
+}
+
+function resetDeck(){
+  remaining=[...questions];
+  currentCount=0;
+  document.getElementById('cards').innerHTML='<div class="empty">전체 카드를 다시 섞었습니다. <b>2장 뽑기</b> 또는 <b>3장 뽑기</b>를 눌러주세요.</div>';
+  document.getElementById('status').textContent='33장 준비됨';
+}
+</script>
+</body>
+</html>
